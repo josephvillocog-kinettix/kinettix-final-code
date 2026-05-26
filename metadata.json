@@ -1,0 +1,6 @@
+{
+  "name": "Tribal Oracle Dashboard",
+  "description": "An immersive tribal-themed dark portal that integrates a wise AI Shaman chat with daily ritual trackers, totem blessings, and runic card drawing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

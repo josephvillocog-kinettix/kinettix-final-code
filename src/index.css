@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cinzel", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Custom styles for glowing embers and dark atmospheric smoke effects */
+@keyframes pulse-amber {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(245, 158, 11, 0.4), 0 0 12px rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(245, 158, 11, 0.8), 0 0 24px rgba(245, 158, 11, 0.4);
+    border-color: rgba(245, 158, 11, 0.7);
+  }
+}
+
+.glow-amber {
+  animation: pulse-amber 4s infinite alternate;
+}
+
+/* Custom scrollbar to match deep charcoal textures */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 0px; /* Hide horizontal scrollbars globally */
+}
+
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0 !important;
+}
+
+/* Define no-scrollbar class to hide scrollbars completely */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+::-webkit-scrollbar-track {
+  background: #12100e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3e2723;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5d4037;
+}
+
+/* Soft fire sparkle animations */
+@keyframes spark-float {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-80px) scale(0.6) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.spark {
+  position: absolute;
+  pointer-events: none;
+  animation: spark-float 3s ease-out infinite;
+}
