@@ -96,7 +96,7 @@ export default function OracleChat({
     }
 
     if (scriptures.length === 0) {
-      setCodeError("The Google Sheets scriptures are not loaded yet. Please wait or reload.");
+      setCodeError("The scriptures are not loaded yet. Please wait or reload.");
       return;
     }
 
