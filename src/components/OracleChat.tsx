@@ -209,11 +209,12 @@ export default function OracleChat({
       <div className="p-4 border-b border-[#2b211a]/80 bg-[#1a1410] flex items-center justify-between shrink-0 select-none z-10">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="shrink-0">
-            <svg className="w-9 h-9 drop-shadow-[0_0_8px_rgba(245,158,11,0.2)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M 12 4 L 38 4 L 64 49 L 38 96 L 12 96 L 38 49 Z" fill="#2EA6EB" />
-              <polygon points="56,4 93,4 69,45 43,26" fill="#89D027" />
-              <polygon points="43,72 69,53 93,96 56,96" fill="#F7941D" />
-            </svg>
+            <img 
+              src="/assets/Asset_1.png" 
+              alt="Asset Logo" 
+              className="w-9 h-9 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.25)] select-none pointer-events-none" 
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
