@@ -47,6 +47,84 @@ export default function OracleChat({
   const [isFinalCodeShown, setIsFinalCodeShown] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Refs and State for Self-Scaling Revelation text container
+  const revelationContainerRef = useRef<HTMLDivElement>(null);
+  const revelationTextRef = useRef<HTMLParagraphElement>(null);
+  const [revelationFontSize, setRevelationFontSize] = useState<number>(24);
+
+  // Reset font size depending on script length to prevent overflow initially and accelerate scaling
+  useEffect(() => {
+    if (matchedScripture?.text) {
+      const len = matchedScripture.text.length;
+      let startSize = 35; // default for short scriptures (was 25, +40% = 35)
+      if (len > 340) {
+        startSize = 17;   // was 12, +40% = 17
+      } else if (len > 240) {
+        startSize = 20;   // was 14, +40% = 20
+      } else if (len > 140) {
+        startSize = 24;   // was 17, +40% = 24
+      } else if (len > 80) {
+        startSize = 28;   // was 20, +40% = 28
+      } else if (len > 40) {
+        startSize = 32;   // was 23, +40% = 32
+      }
+      setRevelationFontSize(startSize);
+    }
+  }, [matchedScripture?.text]);
+
+  // Adjust font size progressively downwards if it still exceeds container height on mount or resize
+  useEffect(() => {
+    if (!matchedScripture?.text) return;
+
+    let active = true;
+    const adjust = () => {
+      if (!active) return;
+      const textEl = revelationTextRef.current;
+      const containerEl = revelationContainerRef.current;
+
+      if (textEl && containerEl) {
+        // Let's dynamic measure. Allow a safe vertical spacing padding
+        const maxAllowed = containerEl.clientHeight - 12;
+        if (textEl.scrollHeight > maxAllowed && revelationFontSize > 10) {
+          setRevelationFontSize((prev) => Math.max(9.5, prev - 0.5));
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(adjust, 35);
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [revelationFontSize, matchedScripture?.text]);
+
+  // Re-trigger calculation on screen width/height changes
+  useEffect(() => {
+    if (!matchedScripture?.text) return;
+
+    const handleResize = () => {
+      const len = matchedScripture.text.length;
+      let startSize = 35; // was 25, +40% = 35
+      if (len > 340) {
+        startSize = 17;   // was 12, +40% = 17
+      } else if (len > 240) {
+        startSize = 20;   // was 14, +40% = 20
+      } else if (len > 140) {
+        startSize = 24;   // was 17, +40% = 24
+      } else if (len > 80) {
+        startSize = 28;   // was 20, +40% = 28
+      } else if (len > 40) {
+        startSize = 32;   // was 23, +40% = 32
+      }
+      setRevelationFontSize(startSize);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [matchedScripture?.text]);
+
   // Auto scroll chat to bottom when unlocked and chatting
   useEffect(() => {
     if (isUnlocked) {
@@ -340,18 +418,15 @@ export default function OracleChat({
             >
               {/* Question text placed directly on the page layout, occupying ~48% height to meet screen size requirements */}
               <div 
+                ref={revelationContainerRef}
                 className="w-full shrink-0 min-h-[48vh] h-[48vh] max-h-[50vh] flex items-center justify-center select-none overflow-y-auto no-scrollbar"
                 id="giant-question-text-wrapper"
               >
                 <div className="w-full max-h-full overflow-y-auto no-scrollbar py-3">
                   <p 
-                    className={`font-sans font-extrabold italic text-amber-100/95 leading-relaxed tracking-wide text-center px-4 select-text selection:bg-amber-900/50 transition-all duration-300 ${
-                      matchedScripture.text.length > 130
-                        ? "text-[clamp(1.0rem,3.8vw,1.6rem)] md:text-[clamp(1.1rem,2.8vh,1.9rem)]"
-                        : matchedScripture.text.length > 70
-                        ? "text-[clamp(1.1rem,4.5vw,1.9rem)] md:text-[clamp(1.3rem,3.3vh,2.3rem)]"
-                        : "text-[clamp(1.2rem,5.5vw,2.3rem)] md:text-[clamp(1.4rem,4vh,2.6rem)]"
-                    }`}
+                    ref={revelationTextRef}
+                    className="font-sans font-extrabold italic text-amber-100/95 leading-relaxed tracking-wide text-center px-4 select-text selection:bg-amber-900/50 transition-all duration-300"
+                    style={{ fontSize: `${revelationFontSize}px` }}
                   >
                     &ldquo;{matchedScripture.text}&rdquo;
                   </p>
