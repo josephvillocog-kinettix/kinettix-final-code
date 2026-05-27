@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Flame, Compass, HelpCircle, Heart, Star, Sparkles, MessageSquare, 
@@ -148,7 +148,50 @@ const ORACLE_CARDS: OracleCard[] = [
   }
 ];
 
+// Client-side decryption helper in case application is deployed statically (e.g. Vercel) without Express proxy
+function decryptKinettix(base64Str: string, key: string = "Kinettix"): string {
+  try {
+    const decoded = atob(base64Str);
+    let dec = '';
+    for (let i = 0; i < decoded.length; i++) {
+      const charCode = decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+      dec += String.fromCharCode(charCode);
+    }
+    return dec;
+  } catch (error) {
+    console.error("Client decryption error:", error);
+    return "Decryption Failed";
+  }
+}
+
 export default function App() {
+  // Generate stable small floating image particles for general global background
+  const globalImageParticles = useMemo(() => {
+    const imagesList = [
+      '/assets/guardians.png',
+      '/assets/keepers.png',
+      '/assets/pathfinders.png',
+      '/assets/raiders.png',
+      '/assets/stormbreakers.png',
+      '/assets/voyagers.png'
+    ];
+
+    return Array.from({ length: 18 }).map((_, i) => {
+      const imgPath = imagesList[i % imagesList.length];
+      const size = Math.floor(Math.random() * 8) + 10; // 10px to 18px (extremely small)
+      return {
+        id: `global-img-part-${i}`,
+        src: imgPath,
+        size,
+        duration: Math.random() * 10 + 15, // 15s to 25s (subtle, non-distracting)
+        delay: Math.random() * 12, // staggered starts
+        left: Math.random() * 100, // random start horizontal %
+        swayX: Math.random() * 40 - 20, // sway factor
+        opacity: Math.random() * 0.12 + 0.12 // extremely low opacity (0.12 to 0.24) so it's transparent and readable
+      };
+    });
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'greeting',
@@ -196,18 +239,65 @@ export default function App() {
       setScripturesLoading(true);
       setScripturesError(null);
       try {
-        const response = await fetch('/api/oracle/sacred-data');
-        if (!response.ok) {
-          throw new Error(`Server returned HTTP status ${response.status}`);
+        let success = false;
+        let data: any = null;
+
+        // Try proxy Express backend first
+        try {
+          const response = await fetch('/api/oracle/sacred-data');
+          if (response.ok) {
+            const parsed = await response.json();
+            if (parsed.success && Array.isArray(parsed.data)) {
+              data = parsed.data;
+              success = true;
+            }
+          }
+        } catch (expressErr) {
+          console.warn("Express backend /api/oracle/sacred-data was not reachable. Statically deployed?", expressErr);
         }
-        const parsed = await response.json();
-        if (parsed.success && Array.isArray(parsed.data)) {
-          setScriptures(parsed.data);
+
+        // If proxy failed, perform Direct Client-Side Fetch & Decryption fallback
+        if (!success) {
+          console.log("Activating direct client-side path fallback for static hosting compatibility...");
+          const targetUrl = "https://script.google.com/macros/s/AKfycbwq1-0-ctmpRuUMvjiqXXTIZjVSqMNXlH46plW33OkC7NT5WpClYg64Mnmd8IWkfTco/exec";
+          const directResponse = await fetch(targetUrl);
+          if (!directResponse.ok) {
+            throw new Error(`Direct connection to Google Apps Script failed: HTTP ${directResponse.status}`);
+          }
+          const rows = await directResponse.json();
+          if (!Array.isArray(rows)) {
+            throw new Error("Invalid structure returned from Google Apps Script.");
+          }
+
+          data = rows.map((row: any) => {
+            const textDec = row.text ? decryptKinettix(row.text) : "";
+            const keywordDec = row.keyword ? decryptKinettix(row.keyword) : "";
+            const codeDec = row.code ? decryptKinettix(row.code) : "";
+            const finalcodeDec = row.finalcode ? decryptKinettix(row.finalcode) : "";
+            const enabled = row.enabled !== false;
+
+            return {
+              originalText: row.text,
+              originalKeyword: row.keyword,
+              originalCode: row.code,
+              originalFinalCode: row.finalcode || "",
+              text: textDec,
+              keyword: keywordDec,
+              code: codeDec,
+              finalcode: finalcodeDec,
+              enabled
+            };
+          });
+          success = true;
+        }
+
+        if (success && data) {
+          setScriptures(data);
         } else {
-          throw new Error(parsed.error || "Malformed scripture packet");
+          throw new Error("Unable to read scriptures via Express proxy or direct client connection.");
         }
       } catch (err: any) {
-        console.error("Failed to call decrypted scriptures API:", err);
+        console.error("Failed to load scriptures:", err);
         setScripturesError(err.message || "Failed to communicate with spiritual Apps Script node.");
       } finally {
         setScripturesLoading(false);
@@ -266,22 +356,55 @@ export default function App() {
     setMessages(updatedMessages);
 
     try {
-      const response = await fetch('/api/oracle/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages }),
-      });
+      let isExpressChatOk = false;
+      let replyText = "";
 
-      if (!response.ok) {
-        throw new Error('Failed to retrieve response from Oracle.');
+      try {
+        const response = await fetch('/api/oracle/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: updatedMessages }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          replyText = data.text;
+          isExpressChatOk = true;
+        }
+      } catch (expressChatErr) {
+        console.warn("Express backend chatbot was not reachable. Statically deployed?", expressChatErr);
       }
 
-      const data = await response.json();
-      
+      if (!isExpressChatOk) {
+        // Premium contextual offline/static chatbot response fallback
+        const lastUserMsg = text.toLowerCase();
+        if (lastUserMsg.includes("wolf") || lastUserMsg.includes("stalker")) {
+          replyText = "The spirit of the Ember Stalker Wolf walks in your shadow, seeker. Its flaming tracks illuminate the deep and overgrown trails of your mind. Keep your senses sharp, for wisdom is hunted with patience.";
+        } else if (lastUserMsg.includes("bear") || lastUserMsg.includes("dweller")) {
+          replyText = "The spirit of the Cave Dweller Bear calls you to quiet shelter and deep inner healing. Calm your thoughts, for the skeleton of your soul grows strong only when the mind surrenders to peaceful solitude.";
+        } else if (lastUserMsg.includes("eagle") || lastUserMsg.includes("visionary") || lastUserMsg.includes("feather")) {
+          replyText = "The master of safe winds, the Sky Visionary Eagle, lends you her high wings. The heavy storms of today are but tiny lines of water from above. Rise with courage, and claim clarity.";
+        } else if (lastUserMsg.includes("bison") || lastUserMsg.includes("provider")) {
+          replyText = "The Plains Provider Bison anchors your feet to the fertile river valleys of our clan. Trust in the steady rhythm of the soil and the collective warmth of the embers. Abundance will sustain you.";
+        } else if (lastUserMsg.includes("card") || lastUserMsg.includes("runic") || lastUserMsg.includes("tarot")) {
+          replyText = "The obsidian stone and runic card hum with ancient energy. The elements ask you to surrender dead weight. Let the old dry branches feed the fire today, so new wild roots may shoot.";
+        } else if (lastUserMsg.includes("scroll") || lastUserMsg.includes("deciphered")) {
+          replyText = "My kindred seeker, you have successfully unlocked a sacred scripture. Its dynamic frequency whispers directly to our crackling Oak fire. Keep executing your daily rituals to ground this destiny.";
+        } else {
+          const fallbacks = [
+            "The oak fire crackles softly. The ancestors whisper that you should look deep within the quiet wood, where all answers wait.",
+            "Like the wild river that contours around the granite slabs, you must bend instead of breaking. Seek the open path of least resistance.",
+            "The owl calls from the dark pine branches, reminding us that wisdom is not found in loud voices, but in silent waiting.",
+            "Allow the smoke of the sacred hearth to carry your burdens into the endless sky. You are grounded, and you are protected."
+          ];
+          replyText = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        }
+      }
+
       const modelMsg: Message = {
         id: `model-${Date.now()}`,
         role: 'model',
-        content: data.text,
+        content: replyText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -352,8 +475,40 @@ export default function App() {
 
       {/* Interactive Main Viewport Area */}
       <main className="flex-1 min-h-0 relative w-full flex flex-col bg-[#0b0807]" id="smartphone-content-viewport">
+        {/* Global extremely small floating totem assets decoration */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+          {globalImageParticles.map((img) => (
+            <motion.img
+              key={img.id}
+              src={img.src}
+              alt="sacred totem global decoration"
+              referrerPolicy="no-referrer"
+              initial={{ y: "110%", opacity: 0, scale: 0.1 }}
+              animate={{
+                y: ["110%", "-10%"],
+                opacity: [0, img.opacity, img.opacity, img.opacity * 0.4, 0],
+                scale: [0.5, 1, 1, 0.7, 0.3],
+                x: [0, img.swayX, -img.swayX, img.swayX / 2],
+                rotate: [0, 180, 360]
+              }}
+              transition={{
+                duration: img.duration,
+                repeat: Infinity,
+                delay: img.delay,
+                ease: "linear"
+              }}
+              className="absolute pointer-events-none select-none z-0 object-contain"
+              style={{
+                width: `${img.size}px`,
+                height: `${img.size}px`,
+                bottom: 0,
+                left: `${img.left}%`
+              }}
+            />
+          ))}
+        </div>
         
-        <div className="w-full max-w-md mx-auto px-4 pt-3 pb-6 flex-1 flex flex-col min-h-0" id="view-inner-body">
+        <div className="w-full max-w-md mx-auto px-4 pt-3 pb-6 flex-1 flex flex-col min-h-0 z-10" id="view-inner-body">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

@@ -85,6 +85,33 @@ export default function OracleChat({
     });
   }, []);
 
+  // Generate stable small floating image particles for background
+  const imageParticles = useMemo(() => {
+    const imagesList = [
+      '/assets/guardians.png',
+      '/assets/keepers.png',
+      '/assets/pathfinders.png',
+      '/assets/raiders.png',
+      '/assets/stormbreakers.png',
+      '/assets/voyagers.png'
+    ];
+
+    return Array.from({ length: 18 }).map((_, i) => {
+      const imgPath = imagesList[i % imagesList.length];
+      const size = Math.floor(Math.random() * 8) + 12; // 12px to 20px (extremely small)
+      return {
+        id: `img-part-${i}`,
+        src: imgPath,
+        size,
+        duration: Math.random() * 6 + 9, // 9s to 15s (slower, gentle floating)
+        delay: Math.random() * 8, // staggered starts
+        left: Math.random() * 100, // random start horizontal %
+        swayX: Math.random() * 30 - 15, // sway factor
+        opacity: Math.random() * 0.25 + 0.35 // subtler opacity (0.35 to 0.6) so it's transparent, mystical
+      };
+    });
+  }, []);
+
   // Handle first phase: Code Verification
   const handleVerifyCode = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -410,6 +437,37 @@ export default function OracleChat({
                       height: `${p.size}px`,
                       bottom: 0,
                       left: `${p.left}%`
+                    }}
+                  />
+                ))}
+
+                {/* Extremely small floating totem assets in the background */}
+                {imageParticles.map((img) => (
+                  <motion.img
+                    key={img.id}
+                    src={img.src}
+                    alt="sacred totem asset"
+                    referrerPolicy="no-referrer"
+                    initial={{ y: "10px", opacity: 0, scale: 0.1, rotate: 0 }}
+                    animate={{
+                      y: ["10px", "-480px"],
+                      opacity: [0, img.opacity, img.opacity, img.opacity * 0.4, 0],
+                      scale: [0.4, 1, 1, 0.7, 0.3],
+                      x: [0, img.swayX, -img.swayX, img.swayX / 2],
+                      rotate: [0, 120, 240, 360]
+                    }}
+                    transition={{
+                      duration: img.duration,
+                      repeat: Infinity,
+                      delay: img.delay,
+                      ease: "linear"
+                    }}
+                    className="absolute pointer-events-none select-none z-0 object-contain opacity-35"
+                    style={{
+                      width: `${img.size}px`,
+                      height: `${img.size}px`,
+                      bottom: 0,
+                      left: `${img.left}%`
                     }}
                   />
                 ))}
