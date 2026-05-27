@@ -506,35 +506,10 @@ export default function OracleChat({
                   </span>
                 </div>
 
-                {/* Click to Copy Control */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const code = matchedScripture.finalcode || "";
-                    if (code) {
-                      navigator.clipboard.writeText(code);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }
-                  }}
-                  className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase transition-all flex items-center gap-2 cursor-pointer ${
-                    copied 
-                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' 
-                      : 'bg-[#211610] hover:bg-[#342217] text-amber-300 hover:text-amber-100 border border-amber-900/40 hover:border-amber-500/40 shadow-sm'
-                  }`}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                      <span>COPIED TO SPELLBOOK!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Scroll className="w-3.5 h-3.5 text-amber-500" />
-                      <span>COPY FINAL CODE</span>
-                    </>
-                  )}
-                </button>
+                {/* Passage Guidance Text */}
+                <p className="text-stone-400 font-sans text-xs text-center max-w-xs mt-1 leading-relaxed">
+                  Pass this code to the chief to get the reward.
+                </p>
               </div>
             </motion.div>
           )}
