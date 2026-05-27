@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Flame, Compass, HelpCircle, Heart, Star, Sparkles, MessageSquare, 
   Feather, Scroll, Wifi, Battery, BookOpen, Clock, RefreshCw, KeyRound, Check, Laptop, Smartphone,
-  Menu, X
+  Menu, X, Lock
 } from 'lucide-react';
 import { Message, Ritual, Totem, OracleCard, SacredScripture } from './types';
 import OracleChat from './components/OracleChat';
@@ -192,6 +192,38 @@ export default function App() {
     });
   }, []);
 
+  // Generate stable fire embers/flames simulating a bonfire burning bottom to top
+  const stableFireParticles = useMemo(() => {
+    return Array.from({ length: 28 }).map((_, i) => {
+      const size = Math.floor(Math.random() * 60) + 50; // 50px to 110px for glowing embers/flames
+      const left = Math.random() * 105 - 2.5; // span across screen
+      const duration = Math.random() * 3.5 + 2.5; // 2.5s to 6s
+      const delay = Math.random() * 5;
+      const sway = Math.random() * 80 - 40;
+      const opacity = Math.random() * 0.14 + 0.12; // warm subtle glow
+      
+      const colors = [
+        'rgba(239, 68, 68, 0.4)',   // red
+        'rgba(249, 115, 22, 0.5)',  // orange
+        'rgba(245, 158, 11, 0.45)', // amber
+        'rgba(251, 146, 60, 0.4)',  // light orange
+        'rgba(253, 224, 71, 0.3)'   // yellow
+      ];
+      const glowColor = colors[i % colors.length];
+
+      return {
+        id: `fire-ember-${i}`,
+        size,
+        left,
+        duration,
+        delay,
+        sway,
+        opacity,
+        glowColor
+      };
+    });
+  }, []);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'greeting',
@@ -231,81 +263,88 @@ export default function App() {
   // Simulated system time indicator inside top header
   const [systemTime, setSystemTime] = useState('');
 
-  // Fetch decrypted Google Apps Script data
+  // Fetch decrypted Google Apps Script data (made standalone to call from retry actions)
+  const fetchDecryptedData = async () => {
+    setScripturesLoading(true);
+    setScripturesError(null);
+    try {
+      let success = false;
+      let data: any = null;
+
+      // Try proxy Express backend first
+      try {
+        const response = await fetch('/api/oracle/sacred-data');
+        if (response.ok) {
+          const parsed = await response.json();
+          if (parsed.success && Array.isArray(parsed.data)) {
+            data = parsed.data;
+            success = true;
+          }
+        }
+      } catch (expressErr) {
+        console.warn("Express backend /api/oracle/sacred-data was not reachable. Statically deployed?", expressErr);
+      }
+
+      // If proxy failed, perform Direct Client-Side Fetch & Decryption fallback
+      if (!success) {
+        console.log("Activating direct client-side path fallback for static hosting compatibility...");
+        const targetUrl = "https://script.google.com/macros/s/AKfycbwq1-0-ctmpRuUMvjiqXXTIZjVSqMNXlH46plW33OkC7NT5WpClYg64Mnmd8IWkfTco/exec";
+        const directResponse = await fetch(targetUrl);
+        if (!directResponse.ok) {
+          throw new Error(`Direct connection to Google Apps Script failed: HTTP ${directResponse.status}`);
+        }
+        const rows = await directResponse.json();
+        if (!Array.isArray(rows)) {
+          throw new Error("Invalid structure returned from Google Apps Script.");
+        }
+
+        data = rows.map((row: any) => {
+          const textDec = row.text ? decryptKinettix(row.text) : "";
+          const keywordDec = row.keyword ? decryptKinettix(row.keyword) : "";
+          const codeDec = row.code ? decryptKinettix(row.code) : "";
+          const finalcodeDec = row.finalcode ? decryptKinettix(row.finalcode) : "";
+          const enabled = row.enabled !== false && row.enabled !== "FALSE" && row.enabled !== "false" && row.enabled !== 0 && row.enabled !== "0";
+
+          return {
+            originalText: row.text,
+            originalKeyword: row.keyword,
+            originalCode: row.code,
+            originalFinalCode: row.finalcode || "",
+            text: textDec,
+            keyword: keywordDec,
+            code: codeDec,
+            finalcode: finalcodeDec,
+            enabled
+          };
+        });
+        success = true;
+      }
+
+      if (success && data) {
+        setScriptures(data);
+      } else {
+        throw new Error("Unable to read scriptures via Express proxy or direct client connection.");
+      }
+    } catch (err: any) {
+      console.error("Failed to load scriptures:", err);
+      setScripturesError(err.message || "Failed to communicate with spiritual Apps Script node.");
+    } finally {
+      setScripturesLoading(false);
+    }
+  };
+
   useEffect(() => {
     setSystemTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    
-    const fetchDecryptedData = async () => {
-      setScripturesLoading(true);
-      setScripturesError(null);
-      try {
-        let success = false;
-        let data: any = null;
-
-        // Try proxy Express backend first
-        try {
-          const response = await fetch('/api/oracle/sacred-data');
-          if (response.ok) {
-            const parsed = await response.json();
-            if (parsed.success && Array.isArray(parsed.data)) {
-              data = parsed.data;
-              success = true;
-            }
-          }
-        } catch (expressErr) {
-          console.warn("Express backend /api/oracle/sacred-data was not reachable. Statically deployed?", expressErr);
-        }
-
-        // If proxy failed, perform Direct Client-Side Fetch & Decryption fallback
-        if (!success) {
-          console.log("Activating direct client-side path fallback for static hosting compatibility...");
-          const targetUrl = "https://script.google.com/macros/s/AKfycbwq1-0-ctmpRuUMvjiqXXTIZjVSqMNXlH46plW33OkC7NT5WpClYg64Mnmd8IWkfTco/exec";
-          const directResponse = await fetch(targetUrl);
-          if (!directResponse.ok) {
-            throw new Error(`Direct connection to Google Apps Script failed: HTTP ${directResponse.status}`);
-          }
-          const rows = await directResponse.json();
-          if (!Array.isArray(rows)) {
-            throw new Error("Invalid structure returned from Google Apps Script.");
-          }
-
-          data = rows.map((row: any) => {
-            const textDec = row.text ? decryptKinettix(row.text) : "";
-            const keywordDec = row.keyword ? decryptKinettix(row.keyword) : "";
-            const codeDec = row.code ? decryptKinettix(row.code) : "";
-            const finalcodeDec = row.finalcode ? decryptKinettix(row.finalcode) : "";
-            const enabled = row.enabled !== false;
-
-            return {
-              originalText: row.text,
-              originalKeyword: row.keyword,
-              originalCode: row.code,
-              originalFinalCode: row.finalcode || "",
-              text: textDec,
-              keyword: keywordDec,
-              code: codeDec,
-              finalcode: finalcodeDec,
-              enabled
-            };
-          });
-          success = true;
-        }
-
-        if (success && data) {
-          setScriptures(data);
-        } else {
-          throw new Error("Unable to read scriptures via Express proxy or direct client connection.");
-        }
-      } catch (err: any) {
-        console.error("Failed to load scriptures:", err);
-        setScripturesError(err.message || "Failed to communicate with spiritual Apps Script node.");
-      } finally {
-        setScripturesLoading(false);
-      }
-    };
-
     fetchDecryptedData();
   }, []);
+
+  // Compute if the portal is closed based on spreadsheet API status
+  const isPortalGateClosed = useMemo(() => {
+    if (scripturesLoading) return false;
+    if (scriptures.length === 0) return false; // don't block yet if scriptures haven't loaded
+    // Check if first row is explicitly disabled or if all rows are disabled
+    return scriptures[0]?.enabled === false || scriptures.every(s => !s.enabled);
+  }, [scriptures, scripturesLoading]);
 
   // Update time periodically
   useEffect(() => {
@@ -450,6 +489,247 @@ export default function App() {
     ]);
     setError(null);
   };
+
+  if (scripturesLoading) {
+    return (
+      <div className="h-screen w-full bg-[#080605] text-[#d6c9c2] antialiased font-sans relative overflow-hidden flex flex-col justify-center items-center">
+        {/* Ambient smoke animations */}
+        <div className="absolute top-[20%] left-[-10%] w-[50%] h-[50%] bg-[#401d0d]/10 rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-[#361c0c]/15 rounded-full blur-[150px] pointer-events-none" />
+
+        {/* Floating background particles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+          {globalImageParticles?.slice(0, 8).map((img) => (
+            <motion.img
+              key={`loader-part-${img.id}`}
+              src={img.src}
+              alt="loading decor particle"
+              referrerPolicy="no-referrer"
+              initial={{ y: "110%", opacity: 0, scale: 0.1 }}
+              animate={{
+                y: ["110%", "-10%"],
+                opacity: [0, img.opacity * 1.5, img.opacity * 1.5, 0],
+                scale: [0.5, 1, 0.5],
+                x: [0, img.swayX, -img.swayX],
+                rotate: [0, 360]
+              }}
+              transition={{
+                duration: img.duration * 0.8,
+                repeat: Infinity,
+                delay: img.delay * 0.5,
+                ease: "linear"
+              }}
+              className="absolute pointer-events-none select-none z-0 object-contain"
+              style={{
+                width: `${img.size}px`,
+                height: `${img.size}px`,
+                bottom: 0,
+                left: `${img.left}%`
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Central Card */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="z-10 text-center space-y-6 max-w-sm px-6 py-8 rounded-2xl bg-[#110d0b] border border-[#231a14] shadow-2xl relative mx-4"
+        >
+          {/* Pulsing Ember */}
+          <div className="relative mx-auto w-16 h-16 flex items-center justify-center bg-amber-950/20 border border-amber-500/10 rounded-full">
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 4, ease: "linear" }}
+              className="absolute inset-[2px] rounded-full border-t border-r border-amber-500/40 border-l-transparent border-b-transparent"
+            />
+            
+            <img 
+              src="/assets/Asset_1.png" 
+              alt="Asset Logo" 
+              className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse" 
+              referrerPolicy="no-referrer"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display font-black text-amber-100 uppercase tracking-widest text-sm">
+              Communing with Ancestors
+            </h2>
+            <p className="text-stone-500 font-mono text-[9px] tracking-widest uppercase">
+              Aligning Portal Gate Frequencies
+            </p>
+          </div>
+
+          <div className="flex gap-1 justify-center items-center">
+            <span className="w-1 h-1 rounded-full bg-amber-500 animate-[pulse_1s_infinite_100ms]" />
+            <span className="w-1 h-1 rounded-full bg-amber-500 animate-[pulse_1s_infinite_300ms]" />
+            <span className="w-1 h-1 rounded-full bg-amber-500 animate-[pulse_1s_infinite_500ms]" />
+          </div>
+
+          <div className="pt-2 text-[9px] font-mono text-amber-700/60 leading-normal uppercase">
+            Syncing decoded G-Sheets scroll network...
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (isPortalGateClosed) {
+    return (
+      <div className="h-screen w-full bg-[#080605] text-[#d6c9c2] antialiased font-sans relative overflow-hidden flex flex-col justify-center items-center">
+        {/* Ambient warm orange/deep red smoke glow */}
+        <div className="absolute top-[20%] left-[-10%] w-[50%] h-[50%] bg-red-950/15 rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-orange-950/10 rounded-full blur-[150px] pointer-events-none" />
+
+        {/* Dynamic Bonfire Flame & Smoke Simulation (bottom to top) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+          {/* Flame Base Glow */}
+          <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-red-950/50 via-[#120b08]/30 to-transparent blur-xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/4 right-1/4 h-36 bg-gradient-to-t from-orange-600/15 via-transparent to-transparent blur-2xl pointer-events-none" />
+
+          {/* Smooth billowing fire/heat masses */}
+          {stableFireParticles.map((ember) => (
+            <motion.div
+              key={ember.id}
+              initial={{ y: "105%", x: 0, opacity: 0, scale: 0.2 }}
+              animate={{
+                y: ["105%", "-40%"],
+                opacity: [0, ember.opacity, ember.opacity * 0.9, ember.opacity * 0.25, 0],
+                scale: [0.3, 1.1, 0.9, 0.4, 0.1],
+                x: [0, ember.sway, -ember.sway / 2, ember.sway * 0.8]
+              }}
+              transition={{
+                duration: ember.duration,
+                repeat: Infinity,
+                delay: ember.delay,
+                ease: "linear"
+              }}
+              className="absolute rounded-full blur-2xl pointer-events-none mix-blend-screen"
+              style={{
+                width: `${ember.size}px`,
+                height: `${ember.size * 1.4}px`,
+                bottom: 0,
+                left: `${ember.left}%`,
+                background: `radial-gradient(circle, ${ember.glowColor} 0%, rgba(0,0,0,0) 70%)`
+              }}
+            />
+          ))}
+
+          {/* Crackling crisp sparks shooting upwards rapidly */}
+          {Array.from({ length: 28 }).map((_, i) => {
+            const size = Math.floor(Math.random() * 4) + 2.5; // 2.5px to 6.5px crisp dots
+            const startLeft = Math.random() * 100;
+            const delay = Math.random() * 6;
+            const duration = Math.random() * 2.8 + 1.8; // speedy
+            const sway = Math.random() * 120 - 60;
+            return (
+              <motion.div
+                key={`spark-ember-closed-${i}`}
+                initial={{ y: "105%", x: 0, opacity: 0 }}
+                animate={{
+                  y: ["105%", "-15%"],
+                  opacity: [0, 1, 0.9, 0],
+                  scale: [0.3, 1.2, 0.4],
+                  x: [0, sway, -sway * 0.5]
+                }}
+                transition={{
+                  duration,
+                  repeat: Infinity,
+                  delay,
+                  ease: "easeInOut"
+                }}
+                className="absolute rounded-full bg-gradient-to-t from-amber-400 via-orange-500 to-yellow-200 shadow-[0_0_8px_#f59e0b] pointer-events-none"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  bottom: 0,
+                  left: `${startLeft}%`
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* Global floating background elements (mystical gray totems) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+          {globalImageParticles?.slice(0, 8).map((img) => (
+            <motion.img
+              key={`closed-part-${img.id}`}
+              src={img.src}
+              alt="closed asset decor particle"
+              referrerPolicy="no-referrer"
+              initial={{ y: "110%", opacity: 0, scale: 0.1 }}
+              animate={{
+                y: ["110%", "-10%"],
+                opacity: [0, img.opacity * 0.6, img.opacity * 0.6, 0],
+                scale: [0.5, 0.9, 0.5],
+                x: [0, img.swayX, -img.swayX],
+                rotate: [0, 360]
+              }}
+              transition={{
+                duration: img.duration * 1.1,
+                repeat: Infinity,
+                delay: img.delay * 0.4,
+                ease: "linear"
+              }}
+              className="absolute pointer-events-none select-none z-10 object-contain filter grayscale border-transparent"
+              style={{
+                width: `${img.size}px`,
+                height: `${img.size}px`,
+                bottom: 0,
+                left: `${img.left}%`
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Main interactive Closed Card wrapper */}
+        <motion.div 
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className="z-10 text-center space-y-6 max-w-sm px-6 py-8 rounded-2xl bg-[#0e0c0b]/95 border border-red-950/40 backdrop-blur-sm shadow-[0_0_50px_rgba(220,38,38,0.06)] relative mx-4"
+        >
+          {/* Logo / Locked Banner */}
+          <div className="relative mx-auto w-16 h-16 flex items-center justify-center bg-red-950/20 border border-red-500/10 rounded-full">
+            <div className="absolute inset-[2px] rounded-full border border-red-500/30 animate-pulse" />
+            
+            <Lock className="w-7 h-7 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display font-black text-red-400 uppercase tracking-widest text-sm text-[13px]">
+              Portal Gate Closed
+            </h2>
+            <p className="text-zinc-500 font-mono text-[9px] tracking-widest uppercase">
+              Ancestral Portal Inactive
+            </p>
+          </div>
+
+          <div className="h-[1px] w-24 mx-auto bg-gradient-to-r from-transparent via-red-950 to-transparent" />
+
+          <p className="font-sans text-xs text-stone-400 leading-relaxed max-w-xs mx-auto">
+            The shamans have sealed the gateway. The tribal hearth burns low, and the digital portal node matches a dormant status from the G-Sheets matrix.
+          </p>
+          
+          <p className="font-sans text-[11px] text-[#f59e0b] italic font-semibold max-w-xs mx-auto leading-relaxed">
+            &ldquo;Seek the campfire signals again once the clan leaders have unsealed the gate.&rdquo;
+          </p>
+
+          <div className="pt-4 border-t border-red-950/20">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-red-500 font-bold animate-pulse">
+              [ Gateway Sealed ]
+            </p>
+            <p className="font-sans text-[11px] text-stone-400 mt-1.5 leading-relaxed">
+              Please come back again once the gate has been unsealed by the leaders.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-full bg-[#080605] text-stone-300 antialiased font-sans relative overflow-hidden flex flex-col">

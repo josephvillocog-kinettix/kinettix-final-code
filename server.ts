@@ -66,7 +66,7 @@ async function startServer() {
         const keywordDec = row.keyword ? decryptKinettix(row.keyword) : "";
         const codeDec = row.code ? decryptKinettix(row.code) : "";
         const finalcodeDec = row.finalcode ? decryptKinettix(row.finalcode) : "";
-        const enabled = row.enabled !== false; // boolean
+        const enabled = row.enabled !== false && row.enabled !== "FALSE" && row.enabled !== "false" && row.enabled !== 0 && row.enabled !== "0";
 
         return {
           originalText: row.text,
