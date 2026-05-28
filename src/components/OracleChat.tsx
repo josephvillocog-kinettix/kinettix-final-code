@@ -46,6 +46,88 @@ export default function OracleChat({
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isFinalCodeShown, setIsFinalCodeShown] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isDecryptingDelay, setIsDecryptingDelay] = useState(false);
+  const lastClickCoords = useRef<{ x: number; y: number } | null>(null);
+
+  // Exploding ember particles when clicking/tapping the "Initiate Gateway Sync" button
+  const [explosionParticles, setExplosionParticles] = useState<{
+    id: string;
+    startX: number;
+    startY: number;
+    targetX: number;
+    targetY: number;
+    size: number;
+    className: string;
+    duration: number;
+    delay: number;
+  }[]>([]);
+  const lastExplosionTime = useRef<number>(0);
+
+  const triggerExplosion = (clientX?: number, clientY?: number) => {
+    const now = Date.now();
+    if (now - lastExplosionTime.current < 110) return;
+    lastExplosionTime.current = now;
+
+    const container = document.getElementById('kinettix-code-reactor');
+    const button = document.getElementById('submit-code-btn') || document.getElementById('decrypt-submit-btn');
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    let startX = containerRect.width / 2;
+    let startY = containerRect.height * 0.55;
+
+    if (clientX !== undefined && clientY !== undefined && clientX > 0 && clientY > 0) {
+      startX = clientX - containerRect.left;
+      startY = clientY - containerRect.top;
+    } else if (button) {
+      const btnRect = button.getBoundingClientRect();
+      startX = (btnRect.left + btnRect.right) / 2 - containerRect.left;
+      startY = (btnRect.top + btnRect.bottom) / 2 - containerRect.top;
+    }
+
+    const newParticles = Array.from({ length: 45 }).map((_, i) => {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 150 + 40; // spread radius
+      
+      const targetX = Math.cos(angle) * distance;
+      // Float/drift upward bias to simulate burning embers lifting
+      const targetY = Math.sin(angle) * distance - Math.random() * 90; 
+
+      const size = Math.floor(Math.random() * 7) + 3.5; // 3.5px to 10px
+      const duration = Math.random() * 0.9 + 0.6; // 0.6s to 1.5s
+      const delay = Math.random() * 0.05;
+
+      const p = Math.random();
+      let className = '';
+      if (p < 0.3) {
+        className = 'from-red-600 via-orange-500 to-amber-400 shadow-[0_0_8px_rgba(239,68,68,0.8)] bg-gradient-to-t';
+      } else if (p < 0.65) {
+        className = 'from-amber-500 via-yellow-400 to-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.95)] bg-gradient-to-t';
+      } else if (p < 0.85) {
+        className = 'from-orange-500 via-amber-400 to-yellow-100 shadow-[0_0_6px_rgba(251,146,60,0.8)] bg-gradient-to-t';
+      } else {
+        className = 'bg-white shadow-[0_0_10px_rgba(255,255,255,1)]';
+      }
+
+      return {
+        id: `explosion-part-${Date.now()}-${i}`,
+        startX,
+        startY,
+        targetX,
+        targetY,
+        size,
+        className,
+        duration,
+        delay
+      };
+    });
+
+    setExplosionParticles((prev) => [...prev, ...newParticles].slice(-100));
+
+    setTimeout(() => {
+      setExplosionParticles((prev) => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+    }, 1600);
+  };
 
   // Refs and State for Self-Scaling Revelation text container
   const revelationContainerRef = useRef<HTMLDivElement>(null);
@@ -193,6 +275,7 @@ export default function OracleChat({
   // Handle first phase: Code Verification
   const handleVerifyCode = (e?: React.FormEvent) => {
     e?.preventDefault();
+    triggerExplosion();
     setCodeError(null);
     const cleanedCode = enteredCode.trim();
     if (!cleanedCode) {
@@ -223,6 +306,7 @@ export default function OracleChat({
   // Handle second phase: Clue/Answer verification
   const handleVerifyAnswer = (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (isDecryptingDelay) return;
     setAnswerError(null);
     const cleanedAnswer = enteredAnswer.trim();
     if (!cleanedAnswer) {
@@ -237,14 +321,29 @@ export default function OracleChat({
     const matchRawKeyword = matchedScripture.originalKeyword.trim().toLowerCase() === cleanedAnswer.toLowerCase();
 
     if (matchKeyword || matchRawKeyword) {
-      setIsUnlocked(true);
-      setIsFinalCodeShown(true);
-      setAnswerError(null);
+      // Trigger exploding ember particles!
+      if (lastClickCoords.current) {
+        triggerExplosion(lastClickCoords.current.x, lastClickCoords.current.y);
+      } else {
+        triggerExplosion();
+      }
 
-      // System notification to trigger wise Shaman chatbot interpretation
-      const unlockedPrompt = `Ancient gate code "${matchedScripture.code}" decrypted successfully with answer "${matchedScripture.keyword}"!`;
-      onSendMessage(unlockedPrompt);
+      // Briefly hold state to allow user to admire the exploding fire embers animation
+      setIsDecryptingDelay(true);
+      
+      setTimeout(() => {
+        setIsUnlocked(true);
+        setIsFinalCodeShown(true);
+        setAnswerError(null);
+        setIsDecryptingDelay(false);
+
+        // System notification to trigger wise Shaman chatbot interpretation
+        const unlockedPrompt = `Ancient gate code "${matchedScripture.code}" decrypted successfully with answer "${matchedScripture.keyword}"!`;
+        onSendMessage(unlockedPrompt);
+      }, 750);
     } else {
+      // Trigger a smaller rumble explosion of dying embers for incorrect key resonance
+      triggerExplosion();
       setAnswerError("INCORRECT! The tribal key failed to resonate. Please try again.");
     }
   };
@@ -374,7 +473,8 @@ export default function OracleChat({
                 <button
                   type="submit"
                   disabled={scripturesLoading}
-                  className="w-full py-3 bg-gradient-to-r from-amber-700 to-amber-900 border border-amber-600/30 hover:border-amber-400 text-amber-100 hover:text-white text-xs font-mono font-bold uppercase tracking-widest rounded-xl shadow-lg hover:shadow-amber-500/10 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
+                  onClick={(e) => triggerExplosion(e.clientX, e.clientY)}
+                  className="w-full py-3 bg-[#e67e22] hover:bg-[#d35400] bg-gradient-to-r from-amber-700 to-amber-900 border border-amber-600/30 hover:border-amber-400 text-amber-100 hover:text-white text-xs font-mono font-bold uppercase tracking-widest rounded-xl shadow-lg hover:shadow-amber-500/10 cursor-pointer transition-all duration-200 flex items-center justify-center gap-2"
                   id="submit-code-btn"
                 >
                   {scripturesLoading ? (
@@ -466,10 +566,23 @@ export default function OracleChat({
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 border border-emerald-600/30 text-emerald-100 hover:text-white text-xs font-mono font-semibold uppercase tracking-widest py-2.5 rounded-xl cursor-pointer shadow-md transition-all"
+                  disabled={isDecryptingDelay}
+                  onClick={(e) => {
+                    lastClickCoords.current = { x: e.clientX, y: e.clientY };
+                    // Highlight the click with an instant burst of sparks!
+                    triggerExplosion(e.clientX, e.clientY);
+                  }}
+                  className="w-full bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 border border-emerald-600/30 text-emerald-100 hover:text-white text-xs font-mono font-semibold uppercase tracking-widest py-2.5 rounded-xl cursor-pointer shadow-md transition-all flex items-center justify-center gap-2"
                   id="decrypt-submit-btn"
                 >
-                  DECRYPT REVELATION
+                  {isDecryptingDelay ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      RESONATING MATRIX...
+                    </>
+                  ) : (
+                    "DECRYPT REVELATION"
+                  )}
                 </button>
               </form>
             </motion.div>
@@ -733,6 +846,36 @@ export default function OracleChat({
           )}
 
         </AnimatePresence>
+      </div>
+
+      {/* Absolute overlay for exploding campfire embers */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-50">
+        {explosionParticles.map((particle) => (
+          <motion.div
+            key={particle.id}
+            initial={{ x: particle.startX, y: particle.startY, opacity: 1, scale: 1 }}
+            animate={{
+              x: particle.startX + particle.targetX,
+              y: [
+                particle.startY,
+                particle.startY + particle.targetY * 0.4 - 15,
+                particle.startY + particle.targetY
+              ],
+              opacity: [1, 0.9, 0.4, 0],
+              scale: [1, 1.3, 0.8, 0]
+            }}
+            transition={{
+              duration: particle.duration,
+              ease: "easeOut",
+              delay: particle.delay
+            }}
+            className={`absolute rounded-full pointer-events-none mix-blend-screen select-none ${particle.className}`}
+            style={{
+              width: `${particle.size}px`,
+              height: `${particle.size}px`
+            }}
+          />
+        ))}
       </div>
 
     </div>
