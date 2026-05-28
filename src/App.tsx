@@ -493,12 +493,80 @@ export default function App() {
   if (scripturesLoading) {
     return (
       <div className="h-screen w-full bg-[#080605] text-[#d6c9c2] antialiased font-sans relative overflow-hidden flex flex-col justify-center items-center">
-        {/* Ambient smoke animations */}
-        <div className="absolute top-[20%] left-[-10%] w-[50%] h-[50%] bg-[#401d0d]/10 rounded-full blur-[150px] pointer-events-none" />
-        <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-[#361c0c]/15 rounded-full blur-[150px] pointer-events-none" />
+        {/* Ambient warm orange/deep red smoke glow */}
+        <div className="absolute top-[20%] left-[-10%] w-[50%] h-[50%] bg-[#401d0d]/15 rounded-full blur-[150px] pointer-events-none" />
+        <div className="absolute bottom-[20%] right-[-10%] w-[50%] h-[50%] bg-[#361c0c]/20 rounded-full blur-[150px] pointer-events-none" />
+
+        {/* Dynamic Bonfire Flame & Smoke Simulation (bottom to top) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+          {/* Flame Base Glow */}
+          <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-amber-950/30 via-[#120b08]/20 to-transparent blur-xl pointer-events-none" />
+          
+          {/* Smooth billowing fire/heat masses */}
+          {stableFireParticles.map((ember) => (
+            <motion.div
+              key={`loader-fire-${ember.id}`}
+              initial={{ y: "15vh", x: 0, opacity: 0, scale: 0.2 }}
+              animate={{
+                y: ["15vh", "-115vh"],
+                opacity: [0, ember.opacity, ember.opacity * 0.9, ember.opacity * 0.25, 0],
+                scale: [0.3, 1.1, 0.9, 0.4, 0.1],
+                x: [0, ember.sway, -ember.sway / 2, ember.sway * 0.8]
+              }}
+              transition={{
+                duration: ember.duration,
+                repeat: Infinity,
+                delay: ember.delay,
+                ease: "linear"
+              }}
+              className="absolute rounded-full blur-2xl pointer-events-none mix-blend-screen"
+              style={{
+                width: `${ember.size}px`,
+                height: `${ember.size * 1.4}px`,
+                bottom: 0,
+                left: `${ember.left}%`,
+                background: `radial-gradient(circle, ${ember.glowColor} 0%, rgba(0,0,0,0) 70%)`
+              }}
+            />
+          ))}
+
+          {/* Crackling crisp sparks shooting upwards rapidly */}
+          {Array.from({ length: 28 }).map((_, i) => {
+            const size = Math.floor(Math.random() * 4) + 2.5; // 2.5px to 6.5px crisp dots
+            const startLeft = Math.random() * 100;
+            const delay = Math.random() * 6;
+            const duration = Math.random() * 2.8 + 1.8; // speedy
+            const sway = Math.random() * 120 - 60;
+            return (
+              <motion.div
+                key={`spark-ember-loader-${i}`}
+                initial={{ y: "10vh", x: 0, opacity: 0 }}
+                animate={{
+                  y: ["10vh", "-110vh"],
+                  opacity: [0, 1, 0.9, 0],
+                  scale: [0.3, 1.2, 0.4],
+                  x: [0, sway, -sway * 0.5]
+                }}
+                transition={{
+                  duration,
+                  repeat: Infinity,
+                  delay,
+                  ease: "easeInOut"
+                }}
+                className="absolute rounded-full bg-gradient-to-t from-amber-400 via-orange-500 to-yellow-200 shadow-[0_0_8px_#f59e0b] pointer-events-none"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  bottom: 0,
+                  left: `${startLeft}%`
+                }}
+              />
+            );
+          })}
+        </div>
 
         {/* Floating background particles */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-10">
           {globalImageParticles?.slice(0, 8).map((img) => (
             <motion.img
               key={`loader-part-${img.id}`}
@@ -508,7 +576,7 @@ export default function App() {
               initial={{ y: "110%", opacity: 0, scale: 0.1 }}
               animate={{
                 y: ["110%", "-10%"],
-                opacity: [0, img.opacity * 1.5, img.opacity * 1.5, 0],
+                opacity: [0, img.opacity * 0.8, img.opacity * 0.8, 0],
                 scale: [0.5, 1, 0.5],
                 x: [0, img.swayX, -img.swayX],
                 rotate: [0, 360]
@@ -519,7 +587,7 @@ export default function App() {
                 delay: img.delay * 0.5,
                 ease: "linear"
               }}
-              className="absolute pointer-events-none select-none z-0 object-contain"
+              className="absolute pointer-events-none select-none z-10 object-contain filter grayscale border-transparent"
               style={{
                 width: `${img.size}px`,
                 height: `${img.size}px`,
