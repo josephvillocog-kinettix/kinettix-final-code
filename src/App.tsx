@@ -593,9 +593,9 @@ export default function App() {
           {stableFireParticles.map((ember) => (
             <motion.div
               key={ember.id}
-              initial={{ y: "105%", x: 0, opacity: 0, scale: 0.2 }}
+              initial={{ y: "15vh", x: 0, opacity: 0, scale: 0.2 }}
               animate={{
-                y: ["105%", "-40%"],
+                y: ["15vh", "-115vh"],
                 opacity: [0, ember.opacity, ember.opacity * 0.9, ember.opacity * 0.25, 0],
                 scale: [0.3, 1.1, 0.9, 0.4, 0.1],
                 x: [0, ember.sway, -ember.sway / 2, ember.sway * 0.8]
@@ -627,9 +627,9 @@ export default function App() {
             return (
               <motion.div
                 key={`spark-ember-closed-${i}`}
-                initial={{ y: "105%", x: 0, opacity: 0 }}
+                initial={{ y: "10vh", x: 0, opacity: 0 }}
                 animate={{
-                  y: ["105%", "-15%"],
+                  y: ["10vh", "-110vh"],
                   opacity: [0, 1, 0.9, 0],
                   scale: [0.3, 1.2, 0.4],
                   x: [0, sway, -sway * 0.5]
@@ -696,7 +696,12 @@ export default function App() {
           <div className="relative mx-auto w-16 h-16 flex items-center justify-center bg-red-950/20 border border-red-500/10 rounded-full">
             <div className="absolute inset-[2px] rounded-full border border-red-500/30 animate-pulse" />
             
-            <Lock className="w-7 h-7 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+            <img 
+              src="/assets/Asset_1.png" 
+              alt="Portal Gate Closed" 
+              className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(239,68,68,0.4)] animate-pulse select-none pointer-events-none" 
+              referrerPolicy="no-referrer"
+            />
           </div>
 
           <div className="space-y-2">
@@ -711,7 +716,7 @@ export default function App() {
           <div className="h-[1px] w-24 mx-auto bg-gradient-to-r from-transparent via-red-950 to-transparent" />
 
           <p className="font-sans text-xs text-stone-400 leading-relaxed max-w-xs mx-auto">
-            The shamans have sealed the gateway. The tribal hearth burns low, and the digital portal node matches a dormant status from the G-Sheets matrix.
+            The shamans have sealed the gateway. The tribal hearth burns low, and the tribe portal node matches a dormant status from the tribal chief matrix.
           </p>
           
           <p className="font-sans text-[11px] text-[#f59e0b] italic font-semibold max-w-xs mx-auto leading-relaxed">
